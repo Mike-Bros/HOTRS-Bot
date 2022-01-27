@@ -34,3 +34,4 @@ coverage.xml
 /config.yaml
 /venv/
 /.idea/
+wayvessel/wv_export.csv
