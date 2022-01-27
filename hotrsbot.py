@@ -1,10 +1,11 @@
-import random
-from distutils.log import info
-
+import os
+import datetime
 import discord
+import asyncio
+
+import pandas as pd
 import yaml
 from discord.ext import commands
-
 from wayvessel import wayvessel
 
 with open('config.yaml') as f:
@@ -87,16 +88,48 @@ async def dungeons(ctx, *arg1):
     if arg1 == ():
         await ctx.channel.send("Usage ```!dungeon <group_id> or all```")
     elif arg1.__contains__('all'):
-        wvembed = wayvessel.ListAllEmbed()
         await ctx.channel.send("This weeks dungeons...")
+        wvembed = wayvessel.ListAllEmbed()
         wvembed.color = colors['PRIMARY']
         await ctx.channel.send(embed=wvembed)
     else:
         try:
             int(arg1[0])
             await ctx.channel.send('Group {} has the following dungeons this week...'.format(arg1[0]))
+            wvembed = wayvessel.ListEmbed(arg1[0])
+            wvembed.color = colors['SECONDARY']
+            await ctx.channel.send(embed=wvembed)
         except ValueError:
             await ctx.channel.send('{} is not a valid argument'.format(arg1[0]))
+
+
+@bot.command(name='reload', help='this command will clear msgs')
+async def reloadDungeonsList(ctx):
+    if ctx.channel.name == "dungeon-list":
+        await ctx.channel.purge()
+
+        df = pd.read_csv('wayvessel/wv_export.csv')
+        modTime = os.path.getmtime('wayvessel/wv_export.csv')
+        modTime = datetime.datetime.utcfromtimestamp(modTime)
+
+        info = discord.Embed(title="Click here to update spreadsheet",
+                             url="https://docs.google.com/spreadsheets/d/1uUdIfWMNmsegoWrZA7Ftd8XK3ipNrIrMmV3wdKl4-W8/edit?usp=sharing",
+                             colour=colors['INFO'],
+                             description="Dungeon List Refreshed based on export last modified: " + str(modTime)
+                             + "\n Once the spreadsheet is updated, please use ``` !reload ```",)
+        await ctx.channel.send(embed=info)
+        await ctx.channel.send("***This weeks dungeons...***")
+        for index, row in df.iterrows():
+            wvembed = wayvessel.ListAllEmbedHelper(row)
+            if row['group_id'] % 2 == 0:
+                wvembed.color = colors['SECONDARY']
+            else:
+                wvembed.color = colors['PRIMARY']
+            await ctx.channel.send(embed=wvembed)
+
+
+    else:
+        await ctx.channel.send("You can only use this in #dungeon-list")
 
 
 bot.run(token)

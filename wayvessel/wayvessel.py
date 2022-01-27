@@ -2,6 +2,12 @@ import discord
 import pandas as pd
 import os
 import datetime
+import yaml
+
+with open('config.yaml') as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+    colors = config['COLORS']
+    token = config['APP']['TOKEN']
 
 
 class WayVessel:
@@ -52,6 +58,56 @@ def ListAllEmbed():
 
     print(df.to_string())
     print("Export last modified: " + str(modTime))
+    for index, row in df.iterrows():
+        wv = WayVessel(
+            row['name_1'],
+            row['name_2'],
+            row['normal'],
+            row['goblin_fort'],
+            row['mystic_cave'],
+            row['beast_den'],
+            row['dragon_roost'],
+            row['battlegrounds'],
+            row['underworld'],
+            row['chaos_portal'],
+            row['valley_gods'],
+            row['group_id']
+        )
+        wvembed.add_field(name=row['name_1'], value=wv.listDungeons() + "\n")
+    return wvembed
+
+
+def ListAllEmbedHelper(row):
+    wvembed = discord.Embed()
+
+    wv = WayVessel(
+        row['name_1'],
+        row['name_2'],
+        row['normal'],
+        row['goblin_fort'],
+        row['mystic_cave'],
+        row['beast_den'],
+        row['dragon_roost'],
+        row['battlegrounds'],
+        row['underworld'],
+        row['chaos_portal'],
+        row['valley_gods'],
+        row['group_id']
+    )
+    wvembed.add_field(name=str(row['name_1']) + " - Group:" + str(row['group_id']), value=wv.listDungeons() + "\n")
+    wvembed.add_field(name="Start Command", value="``` !party " + str(row['id']) + "```")
+    return wvembed
+
+
+def ListEmbed(group_id):
+    wvembed = discord.Embed()
+    df = pd.read_csv('wayvessel/wv_export.csv')
+    modTime = os.path.getmtime('wayvessel/wv_export.csv')
+    modTime = datetime.datetime.utcfromtimestamp(modTime)
+    print("Export last modified: " + str(modTime))
+
+    df = df.loc[df['group_id'] == int(group_id)]
+    print("Restricted Rows... \n" + df.to_string())
     for index, row in df.iterrows():
         wv = WayVessel(
             row['name_1'],
