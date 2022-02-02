@@ -1,13 +1,11 @@
-import json
 import os
 import datetime
 import discord
-import asyncio
-
 import pandas as pd
 import yaml
 from discord.ext import commands
 from wayvessel import wayvessel
+import sqlite3
 
 with open('config.yaml') as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
@@ -16,6 +14,9 @@ with open('config.yaml') as f:
 
 
 class MyClient(discord.Client):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db = None
 
     async def on_ready(self):
         print('Connected!')
@@ -23,9 +24,11 @@ class MyClient(discord.Client):
 
 
 class MyBot(commands.Bot):
+    def __init__(self, command_prefix, **options):
+        super().__init__(command_prefix, **options)
+
     async def foo(self):
         return True
-
 
 
 bot = MyBot(command_prefix='!')
@@ -33,6 +36,26 @@ bot = MyBot(command_prefix='!')
 
 @bot.event
 async def on_ready():
+    bot.db = sqlite3.connect('hotrsbot.db')
+    cur = bot.db.cursor()
+    # Create wayvessel table
+    wayvesselTable = '''CREATE TABLE IF NOT EXISTS wayvessel(
+        id integer PRIMARY KEY AUTOINCREMENT,
+        group_id integer NOT NULL,
+        name_1 text NOT NULL,
+        name_2 text NOT NULL,
+        normal integer DEFAULT 0,
+        goblin_fort integer DEFAULT 0,
+        mystic_cave integer DEFAULT 0,
+        beast_den integer DEFAULT 0,
+        dragon_roost integer DEFAULT 0,
+        battlegrounds integer DEFAULT 0,
+        underworld integer DEFAULT 0,
+        chaos_portal integer DEFAULT 0,
+        valley_gods integer DEFAULT 0
+        )'''
+    cur.execute(wayvesselTable)
+
     print('config.yaml: ' + str(config))
     print('config colors: ' + str(colors))
     print("I am running on: " + bot.user.name)
@@ -113,6 +136,7 @@ async def partyStart(ctx, dungeon_id, time_utc):
             await ctx.channel.send('{} and/or {} are not a valid arguments'.format(dungeon_id, time_utc))
     else:
         await ctx.channel.send('{} is not a valid time, please use UTC 24-Hour format, ex: 2pm = 1400'.format(time_utc))
+
 
 @bot.event
 async def on_raw_reaction_add(payload):
