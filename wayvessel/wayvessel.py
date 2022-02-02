@@ -1,3 +1,5 @@
+import json
+
 import discord
 import pandas as pd
 import os
@@ -11,6 +13,19 @@ with open('config.yaml') as f:
 
 
 class WayVessel:
+    name_1 = None
+    name_2 = None
+    normal = None
+    goblin_fort = None
+    mystic_cave = None
+    beast_den = None
+    dragon_roost = None
+    battlegrounds = None
+    underworld = None
+    chaos_portal = None
+    valley_gods = None
+    group_id = None
+
     def __init__(self, name_1, name_2, normal, goblin_fort, mystic_cave, beast_den, dragon_roost, battlegrounds,
                  underworld, chaos_portal, valley_gods, group_id):
         self.name_1 = name_1
@@ -48,6 +63,26 @@ class WayVessel:
         if self.valley_gods != 0:
             message += " <:valley_gods:936020920064159774>- " + str(self.valley_gods)
         return message
+
+
+def getDungeon(dungeon_id):
+    df = pd.read_csv('wayvessel/wv_export.csv')
+    row = df.loc[df['id'] == dungeon_id]
+    wv = WayVessel(
+        row['name_1'],
+        row['name_2'],
+        row['normal'],
+        row['goblin_fort'],
+        row['mystic_cave'],
+        row['beast_den'],
+        row['dragon_roost'],
+        row['battlegrounds'],
+        row['underworld'],
+        row['chaos_portal'],
+        row['valley_gods'],
+        row['group_id']
+    )
+    return wv
 
 
 def ListAllEmbed():
