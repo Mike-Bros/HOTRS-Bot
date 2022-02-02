@@ -4,6 +4,10 @@ import discord
 import pandas as pd
 import yaml
 from discord.ext import commands
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
 from wayvessel import wayvessel
 import sqlite3
 
@@ -12,11 +16,13 @@ with open('config.yaml') as f:
     colors = config['COLORS']
     token = config['APP']['TOKEN']
 
+# declarative base class
+Base = declarative_base()
+engine = create_engine('sqlite:///' + config['APP']['DBNAME'], echo=True)
 
 class MyClient(discord.Client):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.db = None
 
     async def on_ready(self):
         print('Connected!')
@@ -26,9 +32,7 @@ class MyClient(discord.Client):
 class MyBot(commands.Bot):
     def __init__(self, command_prefix, **options):
         super().__init__(command_prefix, **options)
-
-    async def foo(self):
-        return True
+        self.db_conn = None
 
 
 bot = MyBot(command_prefix='!')
@@ -36,25 +40,7 @@ bot = MyBot(command_prefix='!')
 
 @bot.event
 async def on_ready():
-    bot.db = sqlite3.connect('hotrsbot.db')
-    cur = bot.db.cursor()
-    # Create wayvessel table
-    wayvesselTable = '''CREATE TABLE IF NOT EXISTS wayvessel(
-        id integer PRIMARY KEY AUTOINCREMENT,
-        group_id integer NOT NULL,
-        name_1 text NOT NULL,
-        name_2 text NOT NULL,
-        normal integer DEFAULT 0,
-        goblin_fort integer DEFAULT 0,
-        mystic_cave integer DEFAULT 0,
-        beast_den integer DEFAULT 0,
-        dragon_roost integer DEFAULT 0,
-        battlegrounds integer DEFAULT 0,
-        underworld integer DEFAULT 0,
-        chaos_portal integer DEFAULT 0,
-        valley_gods integer DEFAULT 0
-        )'''
-    cur.execute(wayvesselTable)
+    bot.db_conn = sqlite3.connect(config['APP']['DBNAME'])
 
     print('config.yaml: ' + str(config))
     print('config colors: ' + str(colors))
@@ -94,21 +80,24 @@ async def reloadDungeonsList(ctx):
         modTime = datetime.datetime.utcfromtimestamp(modTime)
 
         info = discord.Embed(title="Click here to update spreadsheet",
-                             url="https://docs.google.com/spreadsheets/d/1uUdIfWMNmsegoWrZA7Ftd8XK3ipNrIrMmV3wdKl4-W8/edit?usp=sharing",
+                             url="https://docs.google.com/spreadsheets/d/1uUdIfWMNmsegoWrZA7Ftd8XK3ipNrIrMmV3wdKl4-W8"
+                                 "/edit?usp=sharing",
                              colour=colors['INFO'],
                              description="Dungeon List Refreshed based on export last modified: " + str(modTime)
                                          + "\n Once the spreadsheet is updated, please use ``` !reload ```", )
         await ctx.channel.send(embed=info)
         await ctx.channel.send("***This weeks dungeons...***")
-        for index, row in df.iterrows():
-            wvembed = wayvessel.ListAllEmbedHelper(row)
-            if row['group_id'] % 2 == 0:
+        wayvessel.clearWVTable(bot.db_conn)
+        wayvessel.saveDungeonsFromExport()
+
+        wayvessels = wayvessel.getAll()
+        for wv in wayvessels:
+            wvembed = wayvessel.singleEmbed(wv)
+            if wv.group_id % 2 == 0:
                 wvembed.color = colors['SECONDARY']
             else:
                 wvembed.color = colors['PRIMARY']
             await ctx.channel.send(embed=wvembed)
-
-
     else:
         await ctx.channel.send("You can only use this in #dungeon-list")
 

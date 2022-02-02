@@ -1,5 +1,9 @@
 import json
-
+import sqlite3
+from sqlalchemy import Column, Integer, Unicode, UnicodeText, String
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 import discord
 import pandas as pd
 import os
@@ -11,35 +15,28 @@ with open('config.yaml') as f:
     colors = config['COLORS']
     token = config['APP']['TOKEN']
 
+# declarative base class
+Base = declarative_base()
+engine = create_engine('sqlite:///' + config['APP']['DBNAME'], echo=True)
 
-class WayVessel:
-    name_1 = None
-    name_2 = None
-    normal = None
-    goblin_fort = None
-    mystic_cave = None
-    beast_den = None
-    dragon_roost = None
-    battlegrounds = None
-    underworld = None
-    chaos_portal = None
-    valley_gods = None
-    group_id = None
 
-    def __init__(self, name_1, name_2, normal, goblin_fort, mystic_cave, beast_den, dragon_roost, battlegrounds,
-                 underworld, chaos_portal, valley_gods, group_id):
-        self.name_1 = name_1
-        self.name_2 = name_2
-        self.normal = normal
-        self.goblin_fort = goblin_fort
-        self.mystic_cave = mystic_cave
-        self.beast_den = beast_den
-        self.dragon_roost = dragon_roost
-        self.battlegrounds = battlegrounds
-        self.underworld = underworld
-        self.chaos_portal = chaos_portal
-        self.valley_gods = valley_gods
-        self.group_id = group_id
+class WayVessel(Base):
+    dbcon = sqlite3.connect(config['APP']['DBNAME'])
+
+    __tablename__ = 'wayvessel'
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, nullable=False)
+    name_1 = Column(String, nullable=False, unique=True)
+    name_2 = Column(String, nullable=False, unique=True)
+    normal = Column(Integer, nullable=True, default=0)
+    goblin_fort = Column(Integer, nullable=True, default=0)
+    mystic_cave = Column(Integer, nullable=True, default=0)
+    beast_den = Column(Integer, nullable=True, default=0)
+    dragon_roost = Column(Integer, nullable=True, default=0)
+    battlegrounds = Column(Integer, nullable=True, default=0)
+    underworld = Column(Integer, nullable=True, default=0)
+    chaos_portal = Column(Integer, nullable=True, default=0)
+    valley_gods = Column(Integer, nullable=True, default=0)
 
     def listDungeons(self):
         message = "WV: " + self.name_2 + "\n"
@@ -65,10 +62,62 @@ class WayVessel:
         return message
 
 
+Base.metadata.create_all(engine)
+
+
+def get_or_create(session, model, **kwargs):
+    instance = session.query(model).filter_by(**kwargs).first()
+    if instance:
+        return instance
+    else:
+        instance = model(**kwargs)
+        session.add(instance)
+        session.commit()
+        return instance
+
+
+def getAll():
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    result = session.query(WayVessel).all()
+    return result
+
+
+def clearWVTable(conn):
+    sql = 'DELETE FROM wayvessel'
+    cur = conn.cursor()
+    cur.execute(sql)
+    conn.commit()
+
+
+def saveDungeonsFromExport():
+    df = pd.read_csv('wayvessel/wv_export.csv')
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    for index, row in df.iterrows():
+        get_or_create(session, WayVessel,
+                      group_id=row['group_id'],
+                      name_1=row['name_1'],
+                      name_2=row['name_2'],
+                      normal=row['normal'],
+                      goblin_fort=row['goblin_fort'],
+                      mystic_cave=row['mystic_cave'],
+                      beast_den=row['beast_den'],
+                      dragon_roost=row['dragon_roost'],
+                      battlegrounds=row['battlegrounds'],
+                      underworld=row['underworld'],
+                      chaos_portal=row['chaos_portal'],
+                      valley_gods=row['valley_gods']
+                      )
+
+    return True
+
+
 def getDungeon(dungeon_id):
     df = pd.read_csv('wayvessel/wv_export.csv')
     row = df.loc[df['id'] == dungeon_id]
     wv = WayVessel(
+        row['group_id'],
         row['name_1'],
         row['name_2'],
         row['normal'],
@@ -79,36 +128,17 @@ def getDungeon(dungeon_id):
         row['battlegrounds'],
         row['underworld'],
         row['chaos_portal'],
-        row['valley_gods'],
-        row['group_id']
+        row['valley_gods']
     )
     return wv
 
 
-def ListAllEmbed():
+def singleEmbed(wayvessel):
     wvembed = discord.Embed()
-    df = pd.read_csv('wayvessel/wv_export.csv')
-    modTime = os.path.getmtime('wayvessel/wv_export.csv')
-    modTime = datetime.datetime.utcfromtimestamp(modTime)
 
-    print(df.to_string())
-    print("Export last modified: " + str(modTime))
-    for index, row in df.iterrows():
-        wv = WayVessel(
-            row['name_1'],
-            row['name_2'],
-            row['normal'],
-            row['goblin_fort'],
-            row['mystic_cave'],
-            row['beast_den'],
-            row['dragon_roost'],
-            row['battlegrounds'],
-            row['underworld'],
-            row['chaos_portal'],
-            row['valley_gods'],
-            row['group_id']
-        )
-        wvembed.add_field(name=row['name_1'], value=wv.listDungeons() + "\n")
+    wvembed.add_field(name=str(wayvessel.name_1) + " - Group:" + str(wayvessel.group_id),
+                      value=wayvessel.listDungeons() + "\n")
+    wvembed.add_field(name="Start Command", value="``` !party " + str(wayvessel.id) + "```")
     return wvembed
 
 
@@ -116,6 +146,7 @@ def ListAllEmbedHelper(row):
     wvembed = discord.Embed()
 
     wv = WayVessel(
+        row['group_id'],
         row['name_1'],
         row['name_2'],
         row['normal'],
@@ -127,7 +158,6 @@ def ListAllEmbedHelper(row):
         row['underworld'],
         row['chaos_portal'],
         row['valley_gods'],
-        row['group_id']
     )
     wvembed.add_field(name=str(row['name_1']) + " - Group:" + str(row['group_id']), value=wv.listDungeons() + "\n")
     wvembed.add_field(name="Start Command", value="``` !party " + str(row['id']) + "```")
