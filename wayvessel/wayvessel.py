@@ -83,6 +83,13 @@ def getAll():
     return result
 
 
+def getDungeon(dungeon_id):
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    result = session.query(WayVessel).where(id=dungeon_id)
+    return result
+
+
 def clearWVTable(conn):
     sql = 'DELETE FROM wayvessel'
     cur = conn.cursor()
@@ -113,24 +120,25 @@ def saveDungeonsFromExport():
     return True
 
 
-def getDungeon(dungeon_id):
-    df = pd.read_csv('wayvessel/wv_export.csv')
-    row = df.loc[df['id'] == dungeon_id]
-    wv = WayVessel(
-        row['group_id'],
-        row['name_1'],
-        row['name_2'],
-        row['normal'],
-        row['goblin_fort'],
-        row['mystic_cave'],
-        row['beast_den'],
-        row['dragon_roost'],
-        row['battlegrounds'],
-        row['underworld'],
-        row['chaos_portal'],
-        row['valley_gods']
-    )
-    return wv
+def allEmbed():
+    wayvessels = getAll()
+    wvembed = discord.Embed()
+    for wv in wayvessels:
+        wvembed.add_field(name=str(wv.name_1) + " - Group:" + str(wv.group_id),
+                          value=wv.listDungeons() + "\n")
+
+    return wvembed
+
+
+def groupEmbed(group_id):
+    wvembed = discord.Embed()
+    wayvessels = getAll()
+    for wv in wayvessels:
+        print(wv.group_id)
+        if wv.group_id == int(group_id):
+            wvembed.add_field(name=wv.name_1, value=wv.listDungeons() + "\n")
+
+    return wvembed
 
 
 def singleEmbed(wayvessel):
@@ -139,54 +147,4 @@ def singleEmbed(wayvessel):
     wvembed.add_field(name=str(wayvessel.name_1) + " - Group:" + str(wayvessel.group_id),
                       value=wayvessel.listDungeons() + "\n")
     wvembed.add_field(name="Start Command", value="``` !party " + str(wayvessel.id) + "```")
-    return wvembed
-
-
-def ListAllEmbedHelper(row):
-    wvembed = discord.Embed()
-
-    wv = WayVessel(
-        row['group_id'],
-        row['name_1'],
-        row['name_2'],
-        row['normal'],
-        row['goblin_fort'],
-        row['mystic_cave'],
-        row['beast_den'],
-        row['dragon_roost'],
-        row['battlegrounds'],
-        row['underworld'],
-        row['chaos_portal'],
-        row['valley_gods'],
-    )
-    wvembed.add_field(name=str(row['name_1']) + " - Group:" + str(row['group_id']), value=wv.listDungeons() + "\n")
-    wvembed.add_field(name="Start Command", value="``` !party " + str(row['id']) + "```")
-    return wvembed
-
-
-def ListEmbed(group_id):
-    wvembed = discord.Embed()
-    df = pd.read_csv('wayvessel/wv_export.csv')
-    modTime = os.path.getmtime('wayvessel/wv_export.csv')
-    modTime = datetime.datetime.utcfromtimestamp(modTime)
-    print("Export last modified: " + str(modTime))
-
-    df = df.loc[df['group_id'] == int(group_id)]
-    print("Restricted Rows... \n" + df.to_string())
-    for index, row in df.iterrows():
-        wv = WayVessel(
-            row['name_1'],
-            row['name_2'],
-            row['normal'],
-            row['goblin_fort'],
-            row['mystic_cave'],
-            row['beast_den'],
-            row['dragon_roost'],
-            row['battlegrounds'],
-            row['underworld'],
-            row['chaos_portal'],
-            row['valley_gods'],
-            row['group_id']
-        )
-        wvembed.add_field(name=row['name_1'], value=wv.listDungeons() + "\n")
     return wvembed

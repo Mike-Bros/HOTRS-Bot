@@ -55,14 +55,14 @@ async def dungeons(ctx, *arg1):
         await ctx.channel.send("Usage ```!dungeon <group_id> or all```")
     elif arg1.__contains__('all'):
         await ctx.channel.send("This weeks dungeons...")
-        wvembed = wayvessel.ListAllEmbed()
+        wvembed = wayvessel.allEmbed()
         wvembed.color = colors['PRIMARY']
         await ctx.channel.send(embed=wvembed)
     else:
         try:
             int(arg1[0])
             await ctx.channel.send('Group {} has the following dungeons this week...'.format(arg1[0]))
-            wvembed = wayvessel.ListEmbed(arg1[0])
+            wvembed = wayvessel.groupEmbed(arg1[0])
             wvembed.color = colors['SECONDARY']
             await ctx.channel.send(embed=wvembed)
         except ValueError:
